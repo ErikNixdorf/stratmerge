@@ -116,7 +116,7 @@ stratigraphic_layers:
                 mean: 0.10
                 max: 0.20
 merge_stratigraphiclayers:
-    activate: true    
+    activate: false    
     merge_rules:
         gwl_up:
             - ntgwl1
@@ -131,8 +131,8 @@ generate_planar_model:
 build_3d_mesh:
     activate: true
     path_to_extruder: C:\\"Program Files"\\Data_Explorer\\bin\\createLayeredMeshFromRasters.exe
-    path_to_planar_mesh: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\data\selke\planar_mesh\nachterstedt_triangles.vtu
-    path_to_dem: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\data\selke\dem\dem.asc
+    path_to_planar_mesh: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\planar_mesh\nachterstedt_triangles_reordered.vtu
+    path_to_dem: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\dem\dem.asc
     remove_soil_layer: true
     minimum_layer_depth: 1
 
