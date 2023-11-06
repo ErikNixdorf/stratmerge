@@ -9,7 +9,6 @@ data_io:
         save_layer_ascii: true
         save_layer_nc: true
         save_model_statistics: true
-        
 stratigraphic_layers:
     mi:
         layer_id: 0
@@ -116,7 +115,7 @@ stratigraphic_layers:
                 mean: 0.10
                 max: 0.20
 merge_stratigraphiclayers:
-    activate: false    
+    activate: true    
     merge_rules:
         gwl_up:
             - ntgwl1
@@ -129,7 +128,7 @@ generate_planar_model:
     base_layer: pt # has to cover entire spatial_domain
     base_layer_thickness: 10 # if non, default will be used
 build_3d_mesh:
-    activate: true
+    activate: false
     path_to_extruder: C:\\"Program Files"\\Data_Explorer\\bin\\createLayeredMeshFromRasters.exe
     path_to_planar_mesh: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\planar_mesh\nachterstedt_triangles_reordered.vtu
     path_to_dem: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\dem\dem.asc

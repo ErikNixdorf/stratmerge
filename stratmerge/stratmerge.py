@@ -511,7 +511,7 @@ class StratMerge:
         v_average_instance.merge_stratigraphic_layers(merge_rule)
         v_average_instance.calculate_hydrogeoproperty_distributions()
         
-        #we can remove the the
+        #we can remove the ones in vertical direction as we have horizontal flow only
         props = list(v_average_instance.hydrogeoproperty_layers.keys())
         for property_name in props:
             if property_name.endswith('_z'):
@@ -824,7 +824,7 @@ class StratMerge:
         
         
     
-def main(path_to_config_file=None):
+def main(config_path=None):
     """
     Default method to run the code and perform various tasks based on configuration.
 
@@ -832,13 +832,13 @@ def main(path_to_config_file=None):
     new_instance: An updated instance of the class.
     geomodel_stats: Statistics of the generated geological model.
     """
-    if path_to_config_file is None:
+    if config_path is None:
         print('No config_file given, take default')
         default_dir = Path(__file__).resolve().parent.parent
         default_config_file_name = 'stratmerge.yml'
-        path_to_config_file = default_dir / default_config_file_name
+        config_path = default_dir / default_config_file_name
     
-    model = StratMerge(path_to_config_file)
+    model = StratMerge(config_path)
     config = model.config
     generate_planar_model = config['generate_planar_model']['activate']
     build_3d_mesh = config['build_3d_mesh']['activate']
@@ -847,10 +847,6 @@ def main(path_to_config_file=None):
     save_nc_layers = config['data_io']['save_subsets']['save_layer_nc']
     save_ascii_layers = build_3d_mesh or config['data_io']['save_subsets']['save_layer_ascii']
             
-    
-    if generate_planar_model and build_3d_mesh:
-            raise ValueError('Only one of generate_planar_model or build_3d_mesh can be activated, not both')
-
     if generate_planar_model and build_3d_mesh:
         raise ValueError('Only one of generate_planar_model or build_3d_mesh can be activated, not both')
 
