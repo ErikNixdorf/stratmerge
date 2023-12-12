@@ -258,23 +258,7 @@ class StratMerge:
         self.ds_thicks = xr.Dataset(thicks)
         #get general attributes
         self.da_attrs=da_base.attrs
-        
-        # finally we check for a base_layer
-        if self.config['generate_planar_model']['activate']:
-            #we correct the thickness of the base_layer
-            base_layer= self.config['generate_planar_model']['base_layer']
-            base_layer_thickness = self.config['generate_planar_model']['base_layer_thickness']
-            if base_layer not in self.layer_names:
-                raise ValueError(f'{base_layer} not in the stratigraphic layer system')
             
-            if base_layer_thickness is not None:
-                #adapt the base_layer_thickness
-                self.ds_thicks[base_layer] = base_layer_thickness * self.ds_thicks[base_layer] / self.ds_thicks[base_layer]
-                #we have to adapt the bottom
-                self.ds_bases[base_layer] = self.ds_tops[base_layer] - base_layer_thickness
-
-    
-
 
                 
     def weight_property(self, property_name: str, calc_function: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> xr.Dataset:
@@ -851,7 +835,23 @@ def main(config_path=None):
         raise ValueError('Only one of generate_planar_model or build_3d_mesh can be activated, not both')
 
     if generate_planar_model:
-        print('Generating a vertically averaged model')
+        print('A 2D vertically averaged planar model is generated')
+        print('Correct the thickness of the base layer')
+        #we correct the thickness of the base_layer
+        base_layer= model.config['generate_planar_model']['base_layer']
+        base_layer_thickness = model.config['generate_planar_model']['base_layer_thickness']
+        if base_layer not in model.layer_names:
+            raise ValueError(f'{base_layer} not in the stratigraphic layer system')
+        
+        if base_layer_thickness is not None:
+            #adapt the base_layer_thickness
+            model.ds_thicks[base_layer] = base_layer_thickness * model.ds_thicks[base_layer] / model.ds_thicks[base_layer]
+            #we have to adapt the bottom
+            model.ds_bases[base_layer] = model.ds_tops[base_layer] - base_layer_thickness
+        
+        
+        
+        print('Calculate the vertical averages')
         new_instance = model.generate_vertical_averages()
     else:
         if merge_stratigraphic_layers:
