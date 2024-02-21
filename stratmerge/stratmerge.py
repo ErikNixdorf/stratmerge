@@ -216,7 +216,7 @@ class StratMerge:
         )
         # check which of the properties is a scalar and which is a tensor
         property_is_scalar= list([
-                self.config['stratigraphic_layers'][outer_key]['properties'][inner_key]['is_scalar']
+                self.config['stratigraphic_layers'][outer_key]['properties'][inner_key]['is_isotropic']
                 for outer_key in self.config['stratigraphic_layers']
                 for inner_key in self.config['stratigraphic_layers'][outer_key]['properties']
             ])
@@ -505,7 +505,9 @@ class StratMerge:
 
     def generate_stratigraphic_ensemble(self,
                                         basic_layer='pt',
-                                        vertical_averaging = True):
+                                        vertical_averaging = True,
+                                        all_layers_only = True,
+                                        stats_to_use = ['mean']):
         """
         Generate stratigraphic ensembles by creating various layer combinations.
 
@@ -534,7 +536,11 @@ class StratMerge:
         #%% get all combinations of the layers
         layer_combinations = []
         # Generate combinations of 1, 2, 3, and 4 entries
-        for r in range(1, len(self.layer_names) + 1):
+        if all_layers_only:
+            layers_min = len(self.layer_names)
+        else:
+            layers_min = 1
+        for r in range(layers_min, len(self.layer_names) + 1):
             for combo in combinations(self.layer_names, r):
                 layer_combinations.append(combo)
         #remove all combinations which do not include the homogeneous layer
@@ -583,7 +589,7 @@ class StratMerge:
             
             # we save each ensemble writing out all statistics as independent layers
             combiner.output_dir=combiner.output_dir / combiner.identifier / 'stratigraphic_ensembles'
-            for stat in ['min','mean','max']:
+            for stat in stats_to_use:
                 combiner.identifier = secrets.token_hex(nbytes=4)
                 
                 
