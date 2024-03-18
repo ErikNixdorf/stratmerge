@@ -142,7 +142,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
     return dataset
 
 class StratMerge:
-    def __init__(self,config_path):
+    def __init__(self,conf:dict):
         """
         loads config and reads tata
 
@@ -157,25 +157,17 @@ class StratMerge:
         None.
 
         """
-        
-        #load config
-        self.config_path= Path(config_path)
-        
-        with open(self.config_path) as c:
-            self.config = yaml.safe_load(c)
-        
+        self.config = conf
         #generate a specific identifier:
         self.identifier= secrets.token_hex(nbytes=4)
-        
-        if self.config_path.is_absolute():
-            self.cwd =Path(self.config_path).parent
-        else:
-            self.cwd = Path.cwd()
-            
+
+        self.cwd = Path.cwd()
+
         
         self.output_dir = Path(self.config['data_io']['output_dir'])
         
         if not self.output_dir.is_absolute():
+
             self.output_dir= self.cwd / self.output_dir
         
         #%% read the files
@@ -259,6 +251,13 @@ class StratMerge:
         #get general attributes
         self.da_attrs=da_base.attrs
             
+    @staticmethod
+    def read_config(config_file_path : Path
+             ) -> dict:
+        """Creates a dictionary out of a YAML file."""
+        with open(config_file_path) as c:
+            conf = yaml.safe_load(c)
+        return conf
 
                 
     def weight_property(self, property_name: str, calc_function: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> xr.Dataset:
@@ -822,13 +821,14 @@ def main(config_path=None):
     new_instance: An updated instance of the class.
     geomodel_stats: Statistics of the generated geological model.
     """
-    if config_path is None:
+    if config_path:
+        configuration = StratMerge.read_config(config_path)
+    else:
         print('No config_file given, take default')
-        default_dir = Path(__file__).resolve().parent.parent
-        default_config_file_name = 'stratmerge.yml'
-        config_path = default_dir / default_config_file_name
+        configuration = StratMerge.read_config(Path(Path(__file__).parents[1], "data/examples/stratmerge.yml"))
+
     
-    model = StratMerge(config_path)
+    model = StratMerge(conf=configuration)
     config = model.config
     generate_planar_model = config['generate_planar_model']['activate']
     build_3d_mesh = config['build_3d_mesh']['activate']
