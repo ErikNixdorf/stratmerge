@@ -6,4 +6,4 @@ build/
 /hooks/
 apply_stratmerge.py
 apply_stratmerge_ensemble.py
-stratmerge_pyenv/
+venv/
