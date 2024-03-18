@@ -2,7 +2,7 @@ info:
     model_name: selke
     contact: Erik Nixdorf
 data_io:
-    stratlayer_dir: example_data\selke\layers
+    data_dir: example_data\selke\layers
     output_dir: output\selke
     nodata_value: -9999
     save_subsets:

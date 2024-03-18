@@ -158,24 +158,18 @@ class StratMerge:
 
         """
         self.config = conf
+        self.paths: dict = {"root": Path(__file__).parents[1]}
+
         #generate a specific identifier:
         self.identifier= secrets.token_hex(nbytes=4)
-
-        self.cwd = Path.cwd()
-
         
-        self.output_dir = Path(self.config['data_io']['output_dir'])
-        
-        if not self.output_dir.is_absolute():
+        self._build_wd()
 
-            self.output_dir= self.cwd / self.output_dir
         
         #%% read the files
         self.stratlayers=dict()
-        stratlayer_dir = Path(self.config['data_io']['stratlayer_dir'])
-        #get the directory of the layers in dependence whether it is relativ or absolute path
-        if not stratlayer_dir.is_absolute():
-            stratlayer_dir= self.cwd / Path(self.config['data_io']['stratlayer_dir'])
+        stratlayer_dir = self.paths['input_dir']
+
         
         #get the names of all layers
         self.layer_names = list(self.config['stratigraphic_layers'].keys())
@@ -258,6 +252,21 @@ class StratMerge:
         with open(config_file_path) as c:
             conf = yaml.safe_load(c)
         return conf
+    
+    
+    def _build_wd(self):
+        """Builds the working directory. Reads paths from configuration files and creates output directories."""
+
+        self.paths["input_dir"] = Path(self.paths["root"],
+                                       self.config['data_io']['data_dir'])
+
+        self.paths["output_dir"] = Path(self.paths["root"],
+                                        self.config['data_io']['output_dir'],
+                                        self.config['info']['model_name'],self.identifier)
+        
+        if any(value for value in self.config['data_io']['save_subsets'].values()):
+            self.paths["output_dir"].mkdir(parents=True, exist_ok=True)
+            Path(self.paths["output_dir"], 'data').mkdir(parents=True, exist_ok=True)
 
                 
     def weight_property(self, property_name: str, calc_function: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> xr.Dataset:
@@ -476,7 +485,9 @@ class StratMerge:
         
         return deepcopy(self)
                 
-    def generate_vertical_averages(self):
+    def generate_vertical_averages(self,
+                                   base_layer='layer',
+                                   base_layer_thickness=5):
         """
         Generate a single layer of average hydrogeological properties as well as thicknesses.
     
@@ -488,7 +499,22 @@ class StratMerge:
         """
         # we generate a new instance of the class
         v_average_instance = deepcopy(self)
- 
+        
+        # we adapt the base layer thickness
+        
+        print('Correct the thickness of the base layer')
+        #we correct the thickness of the base_layer
+        if base_layer not in v_average_instance.layer_names or base_layer is not None :
+            print(f'{base_layer} not in the stratigraphic layer system or not provided, we calculate with defaulr')
+        else:
+            print(f'Correct the thickness of the {base_layer}')
+            #adapt the base_layer_thickness
+            v_average_instance.ds_thicks[base_layer] = base_layer_thickness * v_average_instance.ds_thicks[base_layer] / v_average_instance.ds_thicks[base_layer]
+            #we have to adapt the bottom
+            v_average_instance.ds_bases[base_layer] = v_average_instance.ds_tops[base_layer] - base_layer_thickness
+        
+        
+        print('A 2D vertically averaged planar model is generated') 
         # we define new merge rules based on all layers
         merge_rule={'single_layer':v_average_instance.layer_names}
         v_average_instance.merge_stratigraphic_layers(merge_rule)
@@ -642,8 +668,10 @@ class StratMerge:
             pd.DataFrame: DataFrame containing calculated average statistics.
         """
         if identifier is None:
-            identifier= self.identifier        
-        output_dir= Path(self.output_dir) / identifier
+            output_dir = self.paths['output_dir']
+        else:
+            output_dir = self.paths['output_dir'].parent/Path('identifier')
+        
         ascii_dir = Path(output_dir)/Path('ascii_files')
         ascii_dir.mkdir(parents=True,exist_ok=True)
         nc_dir = Path(output_dir)/Path('nc_files')
@@ -804,12 +832,13 @@ class StratMerge:
                             Path(path_to_extrusion_module),
                             min_acceptable_thickness=minimum_thickness)
         
+        mesh = pv.read(output_path)
         #%% remove the soil layer
         if remove_soil_layer:
-            mesh = pv.read(output_path)
             mesh = mesh.threshold(value=(0,mesh['MaterialIDs'].max()-1),scalars='MaterialIDs')
             mesh.save(output_path)
         
+        return mesh
         
         
     
@@ -840,25 +869,9 @@ def main(config_path=None):
     if generate_planar_model and build_3d_mesh:
         raise ValueError('Only one of generate_planar_model or build_3d_mesh can be activated, not both')
 
-    if generate_planar_model:
-        print('A 2D vertically averaged planar model is generated')
-        print('Correct the thickness of the base layer')
-        #we correct the thickness of the base_layer
-        base_layer= model.config['generate_planar_model']['base_layer']
-        base_layer_thickness = model.config['generate_planar_model']['base_layer_thickness']
-        if base_layer not in model.layer_names:
-            raise ValueError(f'{base_layer} not in the stratigraphic layer system')
-        
-        if base_layer_thickness is not None:
-            #adapt the base_layer_thickness
-            model.ds_thicks[base_layer] = base_layer_thickness * model.ds_thicks[base_layer] / model.ds_thicks[base_layer]
-            #we have to adapt the bottom
-            model.ds_bases[base_layer] = model.ds_tops[base_layer] - base_layer_thickness
-        
-        
-        
-        print('Calculate the vertical averages')
-        new_instance = model.generate_vertical_averages()
+    if generate_planar_model:        
+        new_instance = model.generate_vertical_averages(base_layer = model.config['generate_planar_model']['base_layer'],
+                                                        base_layer_thickness = model.config['generate_planar_model']['base_layer_thickness'])
     else:
         if merge_stratigraphic_layers:
             model.merge_stratigraphic_layers()

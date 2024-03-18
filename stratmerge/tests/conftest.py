@@ -1,38 +1,37 @@
 from pathlib import Path
 import pytest
-from sbat import sbat
+from stratmerge import stratmerge
 
 
 @pytest.fixture(scope="module")
-def model_config1():
-    config = sbat.Model.read_config(
-        Path(Path(__file__).parents[2], "data/examples/ex1_sbat.yml")
+def merge_layers():
+    config = stratmerge.Stratmerge.read_config(
+        Path(Path(__file__).parents[2],'data','examples','ex1','ex1_stratmerge.yml')
     )
-    model = sbat.Model(conf=config, output=False)
-    model.get_discharge_stats()
-    model.get_baseflow(data_ts=model.gauge_ts)
-    model.get_recession_curve()
-    model.get_water_balance()
+    model = stratmerge.Stratmerge.Model(conf=config)
+    model.merge_stratigraphic_layers()
+    model = model.calculate_hydrogeoproperty_distributions()
     return model
 
 
 @pytest.fixture(scope="module")
-def model_config2():
-    config = sbat.Model.read_config(
-        Path(Path(__file__).parents[2], "data/examples/ex2_sbat.yml")
+def vertical_averaging():
+    config = stratmerge.Stratmerge.read_config(
+        Path(Path(__file__).parents[2],'data','examples','ex1','ex1_stratmerge.yml')
     )
-    model = sbat.Model(conf=config, output=False)
-    model.get_recession_curve()
-    return model
+    model = stratmerge.Stratmerge.Model(conf=config)
+    av_model = model.generate_vertical_averages(base_layer = model.config['generate_planar_model']['base_layer'],
+                                                    base_layer_thickness = model.config['generate_planar_model']['base_layer_thickness'])
 
+    return av_model
 
 @pytest.fixture(scope="module")
-def model_config3():
-    config = sbat.Model.read_config(
-        Path(Path(__file__).parents[2], "data/examples/ex3_sbat.yml")
+def extrude_layers():
+    config = stratmerge.Stratmerge.read_config(
+        Path(Path(__file__).parents[2],'data','examples','ex1','ex1_stratmerge.yml')
     )
-    model = sbat.Model(conf=config, output=False)
-    model.get_discharge_stats()
-    model.get_baseflow(data_ts=model.gauge_ts)
-    model.get_water_balance()
-    return model
+    model = stratmerge.Stratmerge.Model(conf=config)
+    extruded_mesh = model.extrude_layers()
+    
+    return extruded_mesh
+
