@@ -168,7 +168,7 @@ class StratMerge:
         
         #%% read the files
         self.stratlayers=dict()
-        stratlayer_dir = self.paths['input_dir']
+        stratlayer_dir = self.paths['input_dir'] /'layers'
 
         
         #get the names of all layers
@@ -217,7 +217,7 @@ class StratMerge:
         self.hydrogeoproperty_names =list(properties_with_type.keys())
         
 
-        
+        self.layer_stats = pd.DataFrame()
         
         #%% We create three different Datasets covering top bottom and so on of each layer 
         # Create dictionaries for tops, bases, and thicks
@@ -266,8 +266,6 @@ class StratMerge:
         
         if any(value for value in self.config['data_io']['save_subsets'].values()):
             self.paths["output_dir"].mkdir(parents=True, exist_ok=True)
-            Path(self.paths["output_dir"], 'data').mkdir(parents=True, exist_ok=True)
-
                 
     def weight_property(self, property_name: str, calc_function: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> xr.Dataset:
         """
@@ -645,14 +643,38 @@ class StratMerge:
         ensemble_stats.to_csv(combiner.output_dir / 'ensemble_stats.csv')
         return ensemble_stats
                 
-      
-            
+    def get_layer_stats(self):
+        """
+        Calculate statistics for each layer of hydrogeological properties.
+        
+        This method computes statistics such as thickness, minimum, and mean for different hydrogeological properties 
+        across different layers.
+        
+        Returns:
+            layer_stats (pandas.DataFrame): DataFrame containing statistics for each layer.
+        """
+        
+        
+        #lets get the layer_thickness
+        self.layer_stats['thickness']=self.ds_thicks.mean().to_array()
+        self.layer_stats.index = list(self.ds_thicks.data_vars)
+        # now we calculate all the min and and mean properties
+        for property_name,prop_data in self.hydrogeoproperty_layers.items():
+
+            stats_to_calculate = prop_data.coords['stat'].values
+            # calculate the spatial mean
+            for stat in stats_to_calculate:
+                data_subset = prop_data.sel(stat=stat)
+                average_property = data_subset.mean().to_array().reset_coords('stat',drop=True)
+                average_property.name = f'{property_name}_{stat}'
+                average_property = average_property.to_dataframe()
                 
+                self.layer_stats=pd.concat([self.layer_stats,average_property],axis=1)
+        return self.layer_stats
+
     def save(self,
              save_ascii=True,
              save_nc=True, 
-             write_statistics =True,
-             select_specific_statistic_only= None,
              identifier = None
              ):
         """
@@ -670,15 +692,13 @@ class StratMerge:
         if identifier is None:
             output_dir = self.paths['output_dir']
         else:
-            output_dir = self.paths['output_dir'].parent/Path('identifier')
+            output_dir = self.paths['output_dir'].parent/Path(identifier)
         
-        ascii_dir = Path(output_dir)/Path('ascii_files')
-        ascii_dir.mkdir(parents=True,exist_ok=True)
-        nc_dir = Path(output_dir)/Path('nc_files')
-        nc_dir.mkdir(parents=True,exist_ok=True)
-        
+
         # Save layer boundary data in ASCII format
         if save_ascii:
+            ascii_dir = Path(output_dir)/Path('ascii_files')
+            ascii_dir.mkdir(parents=True,exist_ok=True)
             for layer in self.layer_names:
                 for data_type in ['top', 'base', 'thick']:
                     file_name = f'{layer}_{data_type}.asc'
@@ -691,38 +711,24 @@ class StratMerge:
          
         # Save layer boundary data in NetCDF format
         if save_nc:
+            nc_dir = Path(output_dir)/Path('nc_files')
+            nc_dir.mkdir(parents=True,exist_ok=True)
             for data_type in ['tops', 'bases', 'thicks']:
                 data = self.__getattribute__('ds_' + data_type)
                 data.to_netcdf(nc_dir / f'layers_{data_type[:-1]}.nc')
         
-        #lets get the th
-        average_thickness= self.ds_thicks.mean().to_array()
-        average_thickness.name='thickness'
-        average_thickness=average_thickness.to_dataframe()
-        average_stats=average_thickness.copy() 
         # now we write out the properties
         for property_name,prop_data in self.hydrogeoproperty_layers.items():
             if save_nc:
                 prop_data.to_netcdf(nc_dir / f'{property_name}.nc')
                 
-            stats_to_calculate = [select_specific_statistic_only] if select_specific_statistic_only else prop_data.coords['stat'].values
-                
-            
             # calculate the spatial mean
-            for stat in stats_to_calculate:
+            for stat in prop_data.coords['stat'].values:
                 data_subset = prop_data.sel(stat=stat)
-                average_property = data_subset.mean().to_array().reset_coords('stat',drop=True)
-                average_property.name = f'{property_name}_{stat}'
-                average_property = average_property.to_dataframe()
-                
-                average_stats=pd.concat([average_stats,average_property],axis=1)
             
                 #more complicated are the ascii files
                 if save_ascii:
-                    if select_specific_statistic_only is not None:
-                        filename_suffix=''
-                    else:
-                        filename_suffix=f'{stat}'
+                    filename_suffix=f'{stat}'
                     
                     for layer in self.layer_names:
                         ascii_filename= f'{layer}_{property_name}_{filename_suffix}.asc'
@@ -732,14 +738,9 @@ class StratMerge:
                                            output_path = ascii_dir /  Path(ascii_filename)
                                            )
                     
-                    
-                   
         #write out the statistics
-        if write_statistics:
-            average_stats.to_csv(output_dir / 'stats_layer_averages.csv')
+        self.layer_stats.to_csv(output_dir / 'stats_layer_averages.csv')
     
-        #return the statistics
-        return average_stats
     
     def extrude_layers(self):
         """
@@ -760,15 +761,29 @@ class StratMerge:
         """
         # Extract configuration options
         extrusion_opts = self.config['build_3d_mesh']
-        path_to_extrusion_module = extrusion_opts['path_to_extruder']
-        path_to_mesh = Path(extrusion_opts['path_to_planar_mesh'])
-        path_to_dem = extrusion_opts['path_to_dem']
+        #add paths to executable
+        if not Path(extrusion_opts['path_to_extruder']).is_absolute():
+            path_to_extrusion_module = self.paths['input_dir'] / extrusion_opts['path_to_extruder']
+        else:
+            path_to_extrusion_module = (extrusion_opts['path_to_extruder'])
+        #2d mesh
+        if not Path(extrusion_opts['path_to_planar_mesh']).is_absolute():
+            path_to_mesh = self.paths['input_dir'] / extrusion_opts['path_to_planar_mesh']
+        else:
+            path_to_mesh = (extrusion_opts['path_to_planar_mesh'])
+        #path to dem
+        if not Path(extrusion_opts['path_to_dem']).is_absolute():
+            path_to_dem = self.paths['input_dir'] / extrusion_opts['path_to_dem']
+        else:
+            path_to_dem = (extrusion_opts['path_to_dem'])
+            
+        
         minimum_thickness = extrusion_opts['minimum_layer_depth']
         remove_soil_layer = extrusion_opts['remove_soil_layer']
         #%% first we check whether the ascii directory is not empty
-        layer_dir = Path(self.output_dir / deepcopy(self.identifier) /'ascii_files')
+        layer_dir = Path(self.paths['output_dir'] /'ascii_files')
         
-        if not any(layer_dir.iterdir()):
+        if 'ascii_files' not in self.paths['output_dir'].iterdir():
             print('Ascii layers are not saved yet,repeat saving')
             self.save(save_ascii=True,identifier=deepcopy(self.identifier))
         

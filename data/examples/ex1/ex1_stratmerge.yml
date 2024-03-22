@@ -2,8 +2,8 @@ info:
     model_name: selke
     contact: Erik Nixdorf
 data_io:
-    stratlayer_dir: example_data\selke\layers
-    output_dir: output\selke
+    data_dir: data\examples\ex1
+    output_dir: output
     nodata_value: -9999
     save_subsets:
         save_layer_ascii: true
@@ -128,10 +128,10 @@ generate_planar_model:
     base_layer: pt # has to cover entire spatial_domain
     base_layer_thickness: 10 # if non, default will be used
 build_3d_mesh:
-    activate: false
+    activate: 
     path_to_extruder: C:\\"Program Files"\\Data_Explorer\\bin\\createLayeredMeshFromRasters.exe
-    path_to_planar_mesh: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\planar_mesh\nachterstedt_triangles_reordered.vtu
-    path_to_dem: C:\Nixdorf.E\Arbeit\Publicationen\Paper_in_Progress\SPR_Geohydromodelling\Data\StratMerge\example_data\selke\dem\dem.asc
+    path_to_planar_mesh: planar_mesh\nachterstedt_triangles.vtu
+    path_to_dem: dem\dem.asc
     remove_soil_layer: true
     minimum_layer_depth: 1
 
