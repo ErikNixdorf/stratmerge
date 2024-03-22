@@ -11,6 +11,7 @@ def merge_layers():
     model = stratmerge.StratMerge(conf=config)
     model.merge_stratigraphic_layers()
     model = model.calculate_hydrogeoproperty_distributions()
+    model.get_layer_stats()
     return model
 
 
@@ -22,7 +23,7 @@ def vertical_averaging():
     model = stratmerge.StratMerge(conf=config)
     av_model = model.generate_vertical_averages(base_layer = model.config['generate_planar_model']['base_layer'],
                                                     base_layer_thickness = model.config['generate_planar_model']['base_layer_thickness'])
-
+    av_model.get_layer_stats()
     return av_model
 
 @pytest.fixture(scope="module")
@@ -30,7 +31,7 @@ def extrude_layers():
     config = stratmerge.StratMerge.read_config(
         Path(Path(__file__).parents[2],'data','examples','ex1','ex1_stratmerge.yml')
     )
-    model = stratmerge.StratMerge.Model(conf=config)
+    model = stratmerge.StratMerge(conf=config)
     model.calculate_hydrogeoproperty_distributions()
     extruded_mesh = model.extrude_layers()
     

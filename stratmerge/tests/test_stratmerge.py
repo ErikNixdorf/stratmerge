@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-class merge_layers:
+class TestMergeLayers:
     def test_existing_layers(self, merge_layers):
         expected = ['htgwl5', 'gwl_up', 'mi', 'egm', 'pt', 'unstructured_Sediments']
 
@@ -40,6 +40,40 @@ class merge_layers:
                ]
         result = merge_layers.layer_stats[[col for col in merge_layers.layer_stats if col !='thickness']].values
         
+        np.testing.assert_almost_equal(
+                    result,
+                    expected,
+                )
+        
+
+class Test_vertical_averaging:
+    def test_existing_layers(self, vertical_averaging):
+        expected = ['single_layer']
+
+        result = vertical_averaging.layer_names
+
+        assert all(key in result for key in expected)
+
+    def test_averaging_properties(self, vertical_averaging):
+        expected =[[2.10032201e+01, 2.93614758e-05, 7.77796622e-05, 2.76224292e-04,
+                4.11034463e-02, 1.24739116e-01, 2.16962774e-01]
+                   ]
+        result= vertical_averaging.layer_stats.values
+        np.testing.assert_almost_equal(
+                    result,
+                    expected,
+                )
+
+
+class Test_extrusion:
+    def test_array_names(self,extrude_layers):
+        expected = ['MaterialIDs']
+        result = extrude_layers.array_names        
+        assert all(key in result for key in expected)
+        
+    def test_cell_distribution (self,extrude_layers):
+        expected = [32406,  8475, 17768, 10299,  5389,  7627,  7380,   742]
+        _,result = np.unique(extrude_layers['MaterialIDs'],return_counts=True)
         np.testing.assert_almost_equal(
                     result,
                     expected,
