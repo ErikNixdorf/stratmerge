@@ -115,7 +115,7 @@ stratigraphic_layers:
                 mean: 0.10
                 max: 0.20
 merge_stratigraphiclayers:
-    activate: true    
+    activate: true 
     merge_rules:
         gwl_up:
             - ntgwl1
@@ -123,6 +123,9 @@ merge_stratigraphiclayers:
         unstructured_Sediments:
             - q
             - t
+    flag_bedding_plane_orientation:
+        activate: true
+        max_relative_slope_deviation: 0.2
 generate_planar_model:
     activate: false
     base_layer: pt # has to cover entire spatial_domain
