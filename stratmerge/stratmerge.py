@@ -6,6 +6,7 @@ equivalent values for their hydrogeological properties
 from pathlib import Path
 from util_functions import read_ascii_grid, write_ascii_grid,asciigrid_to_datarray
 from util_functions import harmonic_weight, arithmetic_weight, has_duplicates, are_values_equal
+from util_functions import slope_aspect_to_dataset
 import numpy as np
 import yaml
 import numpy as np
@@ -137,43 +138,13 @@ def merge_dataset_layers(dataset: xr.Dataset,
     da_subset.name = merged_layer
     da_subset.attrs = dataset[layers_to_merge[0]].attrs
     
+    # if bed plane orientation is important we will check it
+    cell_size = dataset[layers_to_merge[0]].attrs['cellsize'] # cell sizes
     if flag_bedding_plane_orientation['activate']:
-        def compute_slope(array,cell_size=100,calculate_aspect = False):
-            """
-            
-            
-
-            Parameters
-            ----------
-            array : TYPE
-                DESCRIPTION.
-            varargs : TYPE
-                DESCRIPTION.
-            calculate_aspect : TYPE, optional
-                DESCRIPTION. The default is True.
-
-            Returns
-            -------
-            None.
-
-            """
-            # check dimenstion
-            if len(array.dims)!=2:
-                raise ValueError('Array Dimension does not equal 2, only 2D array are supported')
-            
-            gradient = np.gradient(array,cell_size)
-            # slope_degrees = ATAN (rise_run) * 57.29578
-            #  rise_run = √ ([dz/dx]2 + [dz/dy]2]
-            # for details, https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-slope-works.htm
-            # 
-            slope = np.arctan(np.sqrt(gradient[0]**2 + gradient[1]**2)) * np.pi/180
-            
-            if calculate_aspect:
-            #https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-aspect-works.htm
-             aspect = 57.29578 * np.arctan2( ([dz/dy], -[dz/dx])
-            
-        ds_subset.groupby('layer').apply(lambda x: compute_slope(x.squeeze(dim='layer',drop=True),cell_size))
-        print('not ok')
+        #calculate slope and aspect
+        topography = ds_subset.groupby('layer').apply(lambda x:slope_aspect_to_dataset(x,cell_size=cell_size))
+    else:
+        topography = None
           
     # drop the layers which have been mergedfrom top
     dataset = dataset.drop_vars(layers_to_merge)
@@ -181,7 +152,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
     #add the merged layer
     dataset[merged_layer]=da_subset
     
-    return dataset
+    return dataset, topography
 
 class StratMerge:
     def __init__(self,conf:dict):
@@ -286,6 +257,9 @@ class StratMerge:
         self.ds_thicks = xr.Dataset(thicks)
         #get general attributes
         self.da_attrs=da_base.attrs
+        
+        #the mask layer 
+        haha
             
     @staticmethod
     def read_config(config_file_path : Path
@@ -457,6 +431,10 @@ class StratMerge:
                                            merged_layer,
                                            merge_type='min',
                                            flag_bedding_plane_orientation = bedding_dip_conf)
+            
+            # if we test for bedding plane angle differences we do it here
+            if bedding_dip_conf['activate']:
+                print('ok')
             
             #we update the weighted properties as well by just sum then up
             for prop in self.property_weights:
