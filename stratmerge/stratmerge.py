@@ -91,7 +91,9 @@ def dataarray_to_ascii(dataarray: xr.DataArray,
 def merge_dataset_layers(dataset: xr.Dataset, 
                              layers_to_merge: list, 
                              merged_layer: str, 
-                             merge_type: str = 'max') -> xr.Dataset:
+                             merge_type: str,
+                             flag_bedding_plane_orientation : dict,
+                             ) -> xr.Dataset:
     """
      Merge layers in a dataset according to specified rules.
     
@@ -105,7 +107,9 @@ def merge_dataset_layers(dataset: xr.Dataset,
          Name of the new merged layer.
      merge_type : str, optional
          The type of merge operation to perform ('max' or 'min'), by default 'max'.
-    
+    flag_bedding_plane_orientation; dict : 
+        keywords: 'activate'
+        keywords: Threshold : relative deviation
      Returns
      -------
      xr.Dataset
@@ -131,7 +135,45 @@ def merge_dataset_layers(dataset: xr.Dataset,
     ds_subset = dataset[layers_to_merge].to_array(dim='layer')
     da_subset = merge_function(ds_subset)
     da_subset.name = merged_layer
-    da_subset.attrs = dataset[layers_to_merge[0]].attrs  
+    da_subset.attrs = dataset[layers_to_merge[0]].attrs
+    
+    if flag_bedding_plane_orientation['activate']:
+        def compute_slope(array,cell_size=100,calculate_aspect = False):
+            """
+            
+            
+
+            Parameters
+            ----------
+            array : TYPE
+                DESCRIPTION.
+            varargs : TYPE
+                DESCRIPTION.
+            calculate_aspect : TYPE, optional
+                DESCRIPTION. The default is True.
+
+            Returns
+            -------
+            None.
+
+            """
+            # check dimenstion
+            if len(array.dims)!=2:
+                raise ValueError('Array Dimension does not equal 2, only 2D array are supported')
+            
+            gradient = np.gradient(array,cell_size)
+            # slope_degrees = ATAN (rise_run) * 57.29578
+            #  rise_run = √ ([dz/dx]2 + [dz/dy]2]
+            # for details, https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-slope-works.htm
+            # 
+            slope = np.arctan(np.sqrt(gradient[0]**2 + gradient[1]**2)) * np.pi/180
+            
+            if calculate_aspect:
+            #https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-aspect-works.htm
+             aspect = 57.29578 * np.arctan2( ([dz/dy], -[dz/dx])
+            
+        ds_subset.groupby('layer').apply(lambda x: compute_slope(x.squeeze(dim='layer',drop=True),cell_size))
+        print('not ok')
           
     # drop the layers which have been mergedfrom top
     dataset = dataset.drop_vars(layers_to_merge)
@@ -403,15 +445,18 @@ class StratMerge:
             print(f'Creating merged layer {merged_layer}...', end='')
             
             # Merge top  and base layers
+            bedding_dip_conf = self.config['merge_stratigraphiclayers']['flag_bedding_plane_orientation']
             self.ds_tops = merge_dataset_layers(self.ds_tops,
                                            layers_to_merge,
                                            merged_layer,
-                                           merge_type='max')
+                                           merge_type='max',
+                                           flag_bedding_plane_orientation = bedding_dip_conf)
             
             self.ds_bases = merge_dataset_layers(self.ds_bases,
                                            layers_to_merge,
                                            merged_layer,
-                                           merge_type='min')  
+                                           merge_type='min',
+                                           flag_bedding_plane_orientation = bedding_dip_conf)
             
             #we update the weighted properties as well by just sum then up
             for prop in self.property_weights:
