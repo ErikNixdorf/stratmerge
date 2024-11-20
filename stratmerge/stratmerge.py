@@ -93,7 +93,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
                              layers_to_merge: list, 
                              merged_layer: str, 
                              merge_type: str,
-                             flag_bedding_plane_orientation : dict,
+                             mask_bedding_plane_orientation : dict,
                              ) -> xr.Dataset:
     """
      Merge layers in a dataset according to specified rules.
@@ -108,7 +108,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
          Name of the new merged layer.
      merge_type : str, optional
          The type of merge operation to perform ('max' or 'min'), by default 'max'.
-    flag_bedding_plane_orientation; dict : 
+    mask_bedding_plane_orientation; dict : 
         keywords: 'activate'
         keywords: Threshold : relative deviation
      Returns
@@ -140,7 +140,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
     
     # if bed plane orientation is important we will check it
     cell_size = dataset[layers_to_merge[0]].attrs['cellsize'] # cell sizes
-    if flag_bedding_plane_orientation['activate']:
+    if mask_bedding_plane_orientation['activate']:
         #calculate slope and aspect
         topography = ds_subset.groupby('layer',squeeze=False).apply(lambda x:slope_aspect_to_dataset(x,cell_size=cell_size))
     else:
@@ -419,18 +419,18 @@ class StratMerge:
             print(f'Creating merged layer {merged_layer}...', end='')
             
             # Merge top  and base layers
-            bedding_dip_conf = self.config['merge_stratigraphiclayers']['flag_bedding_plane_orientation']
+            bedding_dip_conf = self.config['merge_stratigraphiclayers']['mask_bedding_plane_orientation']
             self.ds_tops, ds_topo_top = merge_dataset_layers(self.ds_tops,
                                            layers_to_merge,
                                            merged_layer,
                                            merge_type='max',
-                                           flag_bedding_plane_orientation = bedding_dip_conf)
+                                           mask_bedding_plane_orientation = bedding_dip_conf)
             
             self.ds_bases, ds_topo_base = merge_dataset_layers(self.ds_bases,
                                            layers_to_merge,
                                            merged_layer,
                                            merge_type='min',
-                                           flag_bedding_plane_orientation = bedding_dip_conf)
+                                           mask_bedding_plane_orientation = bedding_dip_conf)
             
             # if we test for bedding plane angle differences we do it here
             if bedding_dip_conf['activate']:
@@ -755,12 +755,12 @@ class StratMerge:
                 data = self.__getattribute__('ds_' + data_type)
                 data.to_netcdf(nc_dir / f'layers_{data_type[:-1]}.nc')
                 
-        if self.config['merge_stratigraphiclayers']['flag_bedding_plane_orientation']['activate']:
+        if self.config['merge_stratigraphiclayers']['mask_bedding_plane_orientation']['activate']:
             
-            ascii_orientation_dir = Path(output_dir)/Path('horizontal_bedding_plane_check')
+            ascii_orientation_dir = Path(output_dir)/Path('bedding_plan_threshold_mask')
             ascii_orientation_dir.mkdir(parents=True,exist_ok=True)
             for layer in self.is_cell_horizontal:
-                file_name = f'{layer}_is_horizontal.asc'
+                file_name = f'{layer}_is_horizontal_mask.asc'
                 data = self.__getattribute__(f'is_cell_horizontal')[layer].copy()
                 dataarray_to_ascii(data, 
                                    self.da_attrs, 
