@@ -258,8 +258,8 @@ class StratMerge:
         #get general attributes
         self.da_attrs=da_base.attrs
         
-        #the mask layer 
-        haha
+        #the mask layer , true is default so we assume the cells are horizontal
+        self.is_cell_horizontal = self.ds_tops.astype(bool)
             
     @staticmethod
     def read_config(config_file_path : Path
@@ -420,13 +420,13 @@ class StratMerge:
             
             # Merge top  and base layers
             bedding_dip_conf = self.config['merge_stratigraphiclayers']['flag_bedding_plane_orientation']
-            self.ds_tops = merge_dataset_layers(self.ds_tops,
+            self.ds_tops, ds_topo_top = merge_dataset_layers(self.ds_tops,
                                            layers_to_merge,
                                            merged_layer,
                                            merge_type='max',
                                            flag_bedding_plane_orientation = bedding_dip_conf)
             
-            self.ds_bases = merge_dataset_layers(self.ds_bases,
+            self.ds_bases, ds_topo_base = merge_dataset_layers(self.ds_bases,
                                            layers_to_merge,
                                            merged_layer,
                                            merge_type='min',
@@ -434,7 +434,20 @@ class StratMerge:
             
             # if we test for bedding plane angle differences we do it here
             if bedding_dip_conf['activate']:
-                print('ok')
+                #rename the tops and base 
+                ds_topo_base = ds_topo_base.assign_coords(layer=[lay+'_base' for lay in ds_topo_base.coords['layer'].values])
+                ds_topo_top = ds_topo_top.assign_coords(layer=[lay+'_top' for lay in ds_topo_top.coords['layer'].values])
+                #merge
+                ds_topo = xr.concat([ds_topo_base,ds_topo_top],'layer')
+                ds_slope_diff = ds_topo['slope'].max('layer') - ds_topo['slope'].min('layer')
+                #we get boolean array, but we need two steps to deal with the Nans properly which are also ok by defintion
+                #where no layer is, bedding plan does not deviate from horizontal
+                ds_slope_diff_bool = np.invert(ds_slope_diff > bedding_dip_conf['max_slope_deviation'])
+                #add it to the raster
+                self.is_cell_horizontal[merged_layer] = ds_slope_diff_bool
+                #delete the layers which have been merged
+                self.is_cell_horizontal = self.is_cell_horizontal.drop_vars(layers_to_merge)
+                haha
             
             #we update the weighted properties as well by just sum then up
             for prop in self.property_weights:

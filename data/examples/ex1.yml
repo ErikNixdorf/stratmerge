@@ -125,7 +125,7 @@ merge_stratigraphiclayers:
             - t
     flag_bedding_plane_orientation:
         activate: true
-        max_relative_slope_deviation: 0.2
+        max_slope_deviation: 10 # in degree
 generate_planar_model:
     activate: false
     base_layer: pt # has to cover entire spatial_domain

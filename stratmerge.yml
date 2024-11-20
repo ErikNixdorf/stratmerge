@@ -123,6 +123,9 @@ merge_stratigraphiclayers:
         unstructured_Sediments:
             - q
             - t
+    flag_bedding_plane_orientation:
+        activate: true
+        max_slope_deviation: 10 # in degree
 generate_planar_model:
     activate: false
     base_layer: pt # has to cover entire spatial_domain
