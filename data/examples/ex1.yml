@@ -3,7 +3,7 @@ info:
     contact: Erik Nixdorf
 data_io:
     data_dir: data\examples\ex1
-    output_dir: output\selke
+    output_dir: output
     nodata_value: -9999
     save_subsets:
         save_layer_ascii: true

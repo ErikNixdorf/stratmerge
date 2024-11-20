@@ -142,7 +142,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
     cell_size = dataset[layers_to_merge[0]].attrs['cellsize'] # cell sizes
     if flag_bedding_plane_orientation['activate']:
         #calculate slope and aspect
-        topography = ds_subset.groupby('layer').apply(lambda x:slope_aspect_to_dataset(x,cell_size=cell_size))
+        topography = ds_subset.groupby('layer',squeeze=False).apply(lambda x:slope_aspect_to_dataset(x,cell_size=cell_size))
     else:
         topography = None
           
@@ -447,7 +447,8 @@ class StratMerge:
                 self.is_cell_horizontal[merged_layer] = ds_slope_diff_bool
                 #delete the layers which have been merged
                 self.is_cell_horizontal = self.is_cell_horizontal.drop_vars(layers_to_merge)
-                haha
+                
+                print(f'Merge layers{layers_to_merge} into layer {merged_layer} results in {ds_slope_diff_bool.size - int(ds_slope_diff_bool.sum())} elements with inclination above threshold')
             
             #we update the weighted properties as well by just sum then up
             for prop in self.property_weights:
@@ -711,7 +712,8 @@ class StratMerge:
     def save(self,
              save_ascii=True,
              save_nc=True, 
-             identifier = None
+             identifier = None,
+             save_statistics=True,
              ):
         """
         Save data to ASCII and NetCDF files, and calculate statistics.
@@ -752,6 +754,19 @@ class StratMerge:
             for data_type in ['tops', 'bases', 'thicks']:
                 data = self.__getattribute__('ds_' + data_type)
                 data.to_netcdf(nc_dir / f'layers_{data_type[:-1]}.nc')
+                
+        if self.config['merge_stratigraphiclayers']['flag_bedding_plane_orientation']['activate']:
+            
+            ascii_orientation_dir = Path(output_dir)/Path('horizontal_bedding_plane_check')
+            ascii_orientation_dir.mkdir(parents=True,exist_ok=True)
+            for layer in self.is_cell_horizontal:
+                file_name = f'{layer}_is_horizontal.asc'
+                data = self.__getattribute__(f'is_cell_horizontal')[layer].copy()
+                dataarray_to_ascii(data, 
+                                   self.da_attrs, 
+                                   no_data_value = self.config['data_io']['nodata_value'], 
+                                   output_path = ascii_orientation_dir / file_name
+                                   )
         
         # now we write out the properties
         for property_name,prop_data in self.hydrogeoproperty_layers.items():
@@ -775,7 +790,8 @@ class StratMerge:
                                            )
                     
         #write out the statistics
-        self.layer_stats.to_csv(output_dir / 'stats_layer_averages.csv')
+        if save_statistics:
+            self.layer_stats.to_csv(output_dir / 'stats_layer_averages.csv')
     
     
     def extrude_layers(self):
@@ -931,7 +947,7 @@ def main(config_path=None):
     geomodel_stats = new_instance.save(
             save_ascii=save_ascii_layers,
             save_nc=save_nc_layers,
-            write_statistics=save_model_statistics
+            save_statistics=save_model_statistics
         )
     
     if build_3d_mesh:
