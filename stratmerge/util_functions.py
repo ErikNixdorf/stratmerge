@@ -2,6 +2,73 @@ import numpy as np
 import xarray as xr
 from typing import Dict, Union, List
 from pathlib import Path
+
+def slope_aspect_to_dataset(array,cell_size = 100):
+    if 'layer' in array.dims:
+        array = array.squeeze(dim='layer', drop=True)
+
+    # check dimenstion
+    if len(array.dims)!=2:
+        raise ValueError('Array Dimension does not equal 2, only 2D array are supported')            
+    slope,aspect = compute_slope (array,cell_size = cell_size)
+    
+    ds = xr.Dataset({"slope": (('x','y'), slope),
+                     "aspect": (('x','y'), aspect),
+                     }
+                    )
+    return ds
+
+def compute_slope(array,cell_size=100,calculate_aspect = True):
+    """
+    Compute the slope and optionally the aspect of a 2D elevation array.
+    
+    Slope is calculated as the steepest gradient of elevation values, expressed in degrees. 
+    Aspect is the compass direction of the steepest slope, expressed in degrees 
+    (0° for north, increasing clockwise to 360°).
+
+    Parameters
+    ----------
+    array : xarray.DataArray
+        A 2D array representing elevation values. The array must have two dimensions 
+        (e.g., 'x' and 'y') and no missing dimensions.
+    cell_size : float, optional
+        The grid cell size in the same units as the elevation data. Default is 100.
+        This value is used to compute the gradient of the elevation.
+    calculate_aspect : bool, optional
+        If True, the aspect is computed alongside the slope. If False, only the slope 
+        is calculated. Default is True.
+
+    Returns
+    -------
+    tuple
+        slope : xarray.DataArray
+            A 2D array representing the slope in degrees at each cell. 
+            Values range from 0° (flat) to 90° (vertical).
+        aspect : xarray.DataArray or None
+            A 2D array representing the aspect in degrees at each cell. 
+            Values range from 0° to 360°, where 0° is north, 90° is east, 
+            180° is south, and 270° is west. If `calculate_aspect` is False, 
+            this will be None.
+    """
+
+    
+    gradient = np.gradient(array,cell_size)
+    # slope_degrees = ATAN (rise_run) * 57.29578
+    #  rise_run = √ ([dz/dx]2 + [dz/dy]2]
+    # for details, https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-slope-works.htm
+    # 
+    slope = np.arctan(np.sqrt(gradient[0]**2 + gradient[1]**2)) * 180 / np.pi
+    
+    aspect = None
+    if calculate_aspect:
+    #https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-aspect-works.htm
+         aspect = (180 / np.pi) * np.arctan2( gradient[1], -gradient[0])
+         
+         #compass direction values between 0 and 360 degree
+         aspect = np.where(aspect <0, 90.0 - aspect,np.where(aspect>90,360.0 - aspect + 90.0,90-aspect))
+    
+    return slope, aspect
+
 def read_ascii_grid(file_path: str) -> tuple:
     """
     Read data from an ASCII grid file and extract metadata and values.

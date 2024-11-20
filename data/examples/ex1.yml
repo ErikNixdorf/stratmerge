@@ -2,8 +2,8 @@ info:
     model_name: selke
     contact: Erik Nixdorf
 data_io:
-    stratlayer_dir: example_data\selke\layers
-    output_dir: output\selke
+    data_dir: data\examples\ex1
+    output_dir: output
     nodata_value: -9999
     save_subsets:
         save_layer_ascii: true
@@ -115,7 +115,7 @@ stratigraphic_layers:
                 mean: 0.10
                 max: 0.20
 merge_stratigraphiclayers:
-    activate: true    
+    activate: true 
     merge_rules:
         gwl_up:
             - ntgwl1
@@ -123,6 +123,9 @@ merge_stratigraphiclayers:
         unstructured_Sediments:
             - q
             - t
+    mask_bedding_plane_orientation:
+        activate: true
+        max_slope_deviation: 10 # in degree
 generate_planar_model:
     activate: false
     base_layer: pt # has to cover entire spatial_domain

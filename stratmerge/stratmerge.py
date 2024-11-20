@@ -6,6 +6,7 @@ equivalent values for their hydrogeological properties
 from pathlib import Path
 from util_functions import read_ascii_grid, write_ascii_grid,asciigrid_to_datarray
 from util_functions import harmonic_weight, arithmetic_weight, has_duplicates, are_values_equal
+from util_functions import slope_aspect_to_dataset
 import numpy as np
 import yaml
 import numpy as np
@@ -91,7 +92,9 @@ def dataarray_to_ascii(dataarray: xr.DataArray,
 def merge_dataset_layers(dataset: xr.Dataset, 
                              layers_to_merge: list, 
                              merged_layer: str, 
-                             merge_type: str = 'max') -> xr.Dataset:
+                             merge_type: str,
+                             mask_bedding_plane_orientation : dict,
+                             ) -> xr.Dataset:
     """
      Merge layers in a dataset according to specified rules.
     
@@ -105,7 +108,9 @@ def merge_dataset_layers(dataset: xr.Dataset,
          Name of the new merged layer.
      merge_type : str, optional
          The type of merge operation to perform ('max' or 'min'), by default 'max'.
-    
+    mask_bedding_plane_orientation; dict : 
+        keywords: 'activate'
+        keywords: Threshold : relative deviation
      Returns
      -------
      xr.Dataset
@@ -131,7 +136,15 @@ def merge_dataset_layers(dataset: xr.Dataset,
     ds_subset = dataset[layers_to_merge].to_array(dim='layer')
     da_subset = merge_function(ds_subset)
     da_subset.name = merged_layer
-    da_subset.attrs = dataset[layers_to_merge[0]].attrs  
+    da_subset.attrs = dataset[layers_to_merge[0]].attrs
+    
+    # if bed plane orientation is important we will check it
+    cell_size = dataset[layers_to_merge[0]].attrs['cellsize'] # cell sizes
+    if mask_bedding_plane_orientation['activate']:
+        #calculate slope and aspect
+        topography = ds_subset.groupby('layer',squeeze=False).apply(lambda x:slope_aspect_to_dataset(x,cell_size=cell_size))
+    else:
+        topography = None
           
     # drop the layers which have been mergedfrom top
     dataset = dataset.drop_vars(layers_to_merge)
@@ -139,7 +152,7 @@ def merge_dataset_layers(dataset: xr.Dataset,
     #add the merged layer
     dataset[merged_layer]=da_subset
     
-    return dataset
+    return dataset, topography
 
 class StratMerge:
     def __init__(self,conf:dict):
@@ -244,6 +257,9 @@ class StratMerge:
         self.ds_thicks = xr.Dataset(thicks)
         #get general attributes
         self.da_attrs=da_base.attrs
+        
+        #the mask layer , true is default so we assume the cells are horizontal
+        self.is_cell_horizontal = self.ds_tops.astype(bool)
             
     @staticmethod
     def read_config(config_file_path : Path
@@ -403,15 +419,36 @@ class StratMerge:
             print(f'Creating merged layer {merged_layer}...', end='')
             
             # Merge top  and base layers
-            self.ds_tops = merge_dataset_layers(self.ds_tops,
+            bedding_dip_conf = self.config['merge_stratigraphiclayers']['mask_bedding_plane_orientation']
+            self.ds_tops, ds_topo_top = merge_dataset_layers(self.ds_tops,
                                            layers_to_merge,
                                            merged_layer,
-                                           merge_type='max')
+                                           merge_type='max',
+                                           mask_bedding_plane_orientation = bedding_dip_conf)
             
-            self.ds_bases = merge_dataset_layers(self.ds_bases,
+            self.ds_bases, ds_topo_base = merge_dataset_layers(self.ds_bases,
                                            layers_to_merge,
                                            merged_layer,
-                                           merge_type='min')  
+                                           merge_type='min',
+                                           mask_bedding_plane_orientation = bedding_dip_conf)
+            
+            # if we test for bedding plane angle differences we do it here
+            if bedding_dip_conf['activate']:
+                #rename the tops and base 
+                ds_topo_base = ds_topo_base.assign_coords(layer=[lay+'_base' for lay in ds_topo_base.coords['layer'].values])
+                ds_topo_top = ds_topo_top.assign_coords(layer=[lay+'_top' for lay in ds_topo_top.coords['layer'].values])
+                #merge
+                ds_topo = xr.concat([ds_topo_base,ds_topo_top],'layer')
+                ds_slope_diff = ds_topo['slope'].max('layer') - ds_topo['slope'].min('layer')
+                #we get boolean array, but we need two steps to deal with the Nans properly which are also ok by defintion
+                #where no layer is, bedding plan does not deviate from horizontal
+                ds_slope_diff_bool = np.invert(ds_slope_diff > bedding_dip_conf['max_slope_deviation'])
+                #add it to the raster
+                self.is_cell_horizontal[merged_layer] = ds_slope_diff_bool
+                #delete the layers which have been merged
+                self.is_cell_horizontal = self.is_cell_horizontal.drop_vars(layers_to_merge)
+                
+                print(f'Merge layers{layers_to_merge} into layer {merged_layer} results in {ds_slope_diff_bool.size - int(ds_slope_diff_bool.sum())} elements with inclination above threshold')
             
             #we update the weighted properties as well by just sum then up
             for prop in self.property_weights:
@@ -675,7 +712,8 @@ class StratMerge:
     def save(self,
              save_ascii=True,
              save_nc=True, 
-             identifier = None
+             identifier = None,
+             save_statistics=True,
              ):
         """
         Save data to ASCII and NetCDF files, and calculate statistics.
@@ -716,6 +754,19 @@ class StratMerge:
             for data_type in ['tops', 'bases', 'thicks']:
                 data = self.__getattribute__('ds_' + data_type)
                 data.to_netcdf(nc_dir / f'layers_{data_type[:-1]}.nc')
+                
+        if self.config['merge_stratigraphiclayers']['mask_bedding_plane_orientation']['activate']:
+            
+            ascii_orientation_dir = Path(output_dir)/Path('bedding_plan_threshold_mask')
+            ascii_orientation_dir.mkdir(parents=True,exist_ok=True)
+            for layer in self.is_cell_horizontal:
+                file_name = f'{layer}_is_horizontal_mask.asc'
+                data = self.__getattribute__(f'is_cell_horizontal')[layer].copy()
+                dataarray_to_ascii(data, 
+                                   self.da_attrs, 
+                                   no_data_value = self.config['data_io']['nodata_value'], 
+                                   output_path = ascii_orientation_dir / file_name
+                                   )
         
         # now we write out the properties
         for property_name,prop_data in self.hydrogeoproperty_layers.items():
@@ -739,7 +790,8 @@ class StratMerge:
                                            )
                     
         #write out the statistics
-        self.layer_stats.to_csv(output_dir / 'stats_layer_averages.csv')
+        if save_statistics:
+            self.layer_stats.to_csv(output_dir / 'stats_layer_averages.csv')
     
     
     def extrude_layers(self):
@@ -895,7 +947,7 @@ def main(config_path=None):
     geomodel_stats = new_instance.save(
             save_ascii=save_ascii_layers,
             save_nc=save_nc_layers,
-            write_statistics=save_model_statistics
+            save_statistics=save_model_statistics
         )
     
     if build_3d_mesh:
