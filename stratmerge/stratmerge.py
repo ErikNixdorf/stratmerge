@@ -418,6 +418,13 @@ class StratMerge:
         for merged_layer,layers_to_merge in merge_rules.items():
             print(f'Creating merged layer {merged_layer}...', end='')
             
+            #we check that all layers are adjacent, so there is a distance of 1 in the layer list among them
+            merge_layer_order = self.layer_order[layers_to_merge].sort_values()
+            #check whether the subset is non-adjacent, which means the difference between layer order id is larger 1
+            if sum(merge_layer_order.diff()>1)>=1:
+                print(f'Merging of layers {layers_to_merge} is refused as it is not a set of adjacent layers')
+                continue
+            
             # Merge top  and base layers
             bedding_dip_conf = self.config['merge_stratigraphiclayers']['mask_bedding_plane_orientation']
             self.ds_tops, ds_topo_top = merge_dataset_layers(self.ds_tops,
