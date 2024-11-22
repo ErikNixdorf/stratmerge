@@ -4,6 +4,35 @@ from typing import Dict, Union, List
 from pathlib import Path
 
 def slope_aspect_to_dataset(array,cell_size = 100):
+    """
+    Computes the slope and aspect of a 2D array representing elevation data 
+    and returns the results as an xarray Dataset.
+
+    Parameters:
+    -----------
+    array : xarray.DataArray
+        A 2D array representing elevation data. If a "layer" dimension is present, 
+        it will be removed by squeezing.
+    cell_size : float, optional
+        The cell size (resolution) of the grid in the same units as the elevation 
+        data. Defaults to 100.
+
+    Returns:
+    --------
+    xarray.Dataset
+        A dataset containing two 2D DataArrays
+    Raises:
+    -------
+    ValueError
+        If the input array does not have exactly two dimensions after processing.
+
+    Notes:
+    ------
+    - This function relies on an external `compute_slope` function to calculate 
+      slope and aspect. Ensure it is defined or imported before using this function.
+    - The slope is calculated as the maximum rate of change of elevation, and the 
+      aspect is the direction of the steepest slope.
+    """
     if 'layer' in array.dims:
         array = array.squeeze(dim='layer', drop=True)
 
