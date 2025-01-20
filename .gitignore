@@ -8,3 +8,4 @@ apply_stratmerge.py
 apply_stratmerge_ensemble.py
 venv/
 test_stratmerge_tests.py
+/case_study_selke/
